@@ -1,0 +1,123 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>골프 머니 계산기 (합계 0 보장 · 안정판)</title>
+<style>
+body { font-family: Arial, sans-serif; padding: 16px; }
+table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+th, td { border: 1px solid #ccc; padding: 6px; text-align: center; font-size: 13px; }
+input { width: 70px; }
+.controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.result { font-size: 15px; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<h2>골프 머니 계산기 (합계 0 보장 · 안정 최종판)</h2>
+
+<div class="controls">
+플레이어 수:
+<select id="playerCount" onchange="renderTable()">
+  <option value="2">2명</option>
+  <option value="3" selected>3명</option>
+  <option value="4">4명</option>
+  <option value="5">5명</option>
+</select>
+
+기본 타당($): <input id="rate" value="2">
+버디($): <input id="birdieBonus" value="5">
+이글($): <input id="eagleBonus" value="20">
+스킨($): <input id="skinValue" value="2">
+</div>
+
+<table id="scoreTable"></table>
+
+<div class="result">
+  <button onclick="calc()">계산</button>
+  <div id="result"></div>
+</div>
+
+<script>
+function renderTable() {
+  const count = Number(document.getElementById("playerCount").value);
+  const table = document.getElementById("scoreTable");
+
+  let html = "<tr><th>Par</th>";
+  for (let i = 0; i < count; i++) html += `<th>Player ${i+1}</th>`;
+  html += "</tr>";
+
+  html += "<tr><td><input id='par' value='4'></td>";
+  for (let i = 0; i < count; i++) html += `<td><input class='score'></td>`;
+  html += "</tr>";
+
+  table.innerHTML = html;
+}
+
+function calc() {
+  const rate = Number(document.getElementById("rate").value);
+  const birdieBonus = Number(document.getElementById("birdieBonus").value);
+  const eagleBonus = Number(document.getElementById("eagleBonus").value);
+  const skinValue = Number(document.getElementById("skinValue").value);
+  const par = Number(document.getElementById("par").value);
+  const scores = [...document.querySelectorAll(".score")].map(e => Number(e.value));
+  const count = scores.length;
+
+  let money = new Array(count).fill(0);
+
+  // 1) 타수 차이 (항상 합계 0)
+  for (let i = 0; i < count; i++) {
+    for (let j = i + 1; j < count; j++) {
+      const diff = scores[i] - scores[j];
+      if (diff > 0) {
+        money[i] -= diff * rate;
+        money[j] += diff * rate;
+      } else if (diff < 0) {
+        money[i] += Math.abs(diff) * rate;
+        money[j] -= Math.abs(diff) * rate;
+      }
+    }
+  }
+
+  // 2) 보너스 (이글 우선, 버디는 중복 없음)
+  scores.forEach((s, i) => {
+    if (s <= par - 2) {
+      // 이글
+      money[i] += eagleBonus * (count - 1);
+      for (let j = 0; j < count; j++) if (j !== i) money[j] -= eagleBonus;
+    } else if (s === par - 1) {
+      // 버디
+      money[i] += birdieBonus * (count - 1);
+      for (let j = 0; j < count; j++) if (j !== i) money[j] -= birdieBonus;
+    }
+  });
+
+  // 3) 스킨 (단독 최저 & 파 이상)
+  const minScore = Math.min(...scores);
+  const winnerCount = scores.filter(s => s === minScore).length;
+
+  if (winnerCount === 1 && minScore <= par) {
+    const idx = scores.indexOf(minScore);
+    money[idx] += skinValue * (count - 1);
+    for (let j = 0; j < count; j++) if (j !== idx) money[j] -= skinValue;
+  }
+
+  // 결과 출력 + 합계 검증
+  let sum = MoneySum(money);
+  let out = "";
+  money.forEach((m, i) => out += `Player ${i+1}: $${m.toFixed(0)}<br>`);
+  out += `<br><b>총합: $${sum.toFixed(0)} (0이 나와야 정상)</b>`;
+
+  document.getElementById("result").innerHTML = out;
+}
+
+function MoneySum(arr) {
+  return arr.reduce((a,b) => a+b, 0);
+}
+
+renderTable();
+</script>
+
+</body>
+</html>
